@@ -1,0 +1,12 @@
+[package]
+name = "dementia"
+version = "0.0.1"
+authors = ["Robert Czechowski <robert+git@czecho.de>"]
+
+[dependencies]
+reqwest = "0.8.5"
+serde = "1.0.27"
+serde_derive = "1.0.27"
+serde_json = "1.0.9"
+url = "1.7.0"
+rand = "0.4"
