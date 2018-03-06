@@ -2,6 +2,8 @@
 name = "dementia"
 version = "0.0.1"
 authors = ["Robert Czechowski <robert+git@czecho.de>"]
+description = "A small client library for the Matrix protocoll"
+license="Apache-2.0/GPL-3.0"
 
 [dependencies]
 reqwest = "0.8.5"
