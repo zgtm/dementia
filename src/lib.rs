@@ -135,6 +135,30 @@ impl MatrixHomeserver {
             info : self.info.clone(),
         }            
     }
+    pub fn create_room(&self, room_name : String) -> Option<MatrixRoom> {
+        let mut map : HashMap<String,String> = HashMap::new();
+        
+        map.insert("room_alias_name".to_owned() , room_name);
+        map.insert("preset".to_owned() , "public_chat".to_owned());
+        
+        let mut res = self.client.post(
+            &format!("{}/_matrix/client/r0/createRoom?access_token={}",
+                     self.info.server_name,
+                     utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
+            .json(&map)
+            .send()
+            .unwrap();
+        let info: Result<JoinInfo, _> = res.json();
+        match info {
+            Ok(info) => Some(MatrixRoom {
+                id: info.room_id,
+                latest_since: None,
+                client : self.client.clone(),
+                info : self.info.clone(),
+            }),
+            _ => None
+        }
+    }
 }
 
 extern crate rand;
