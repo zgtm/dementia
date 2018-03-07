@@ -52,17 +52,6 @@ pub struct MatrixHomeserver {
     info: ServerInfo,
 }
 
-pub trait Homeserver {
-    fn new(info : ServerInfo) -> Self;
-    fn login(info : LoginInfo) -> Self;
-    fn join(&self, room_name : String) -> MatrixRoom;
-}
-
-pub trait Room {
-    fn get_new_messages(&mut self) -> Vec<String>;
-    fn send_message(&self, message: String );
-}
-
 use url::percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET,  PATH_SEGMENT_ENCODE_SET};
 
 define_encode_set! {
@@ -71,14 +60,14 @@ define_encode_set! {
     }
 }
 
-impl Homeserver for MatrixHomeserver {
-    fn new(info : ServerInfo) -> Self {
+impl MatrixHomeserver {
+    pub fn new(info : ServerInfo) -> Self {
         MatrixHomeserver {
             client : Rc::new(reqwest::Client::new()),
             info: info
         }
     }
-    fn login(info : LoginInfo) -> Self {
+    pub fn login(info : LoginInfo) -> Self {
         let client = reqwest::Client::new();
 
         let mut res = client.get(
@@ -125,7 +114,7 @@ impl Homeserver for MatrixHomeserver {
             }
         }
     }
-    fn join(&self, room_name : String) -> MatrixRoom {
+    pub fn join(&self, room_name : String) -> MatrixRoom {
         let mut map : HashMap<String,String> = HashMap::new();
         let request_url = self.info.server_name.clone();
         
@@ -151,8 +140,8 @@ impl Homeserver for MatrixHomeserver {
 
 extern crate rand;
 
-impl Room for MatrixRoom {
-    fn get_new_messages(&mut self) -> Vec<String> {
+impl MatrixRoom {
+    pub fn get_new_messages(&mut self) -> Vec<String> {
         match self.latest_since.clone() {
             None => {    
                 let mut res = self.client.get(
@@ -201,7 +190,7 @@ impl Room for MatrixRoom {
         }
             
     }
-    fn send_message(&self, message: String ) {
+    pub fn send_message(&self, message: String ) {
         let mut map : HashMap<String,String> = HashMap::new();
         
         map.insert("msgtype".to_owned() , "m.text".to_owned());
