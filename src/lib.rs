@@ -5,7 +5,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate url;
 
-use serde_json::{Value, Error};
+use serde_json::{Value};
 
 use std::collections::HashMap;
 
@@ -115,8 +115,7 @@ impl MatrixHomeserver {
         }
     }
     pub fn join(&self, room_name : String) -> MatrixRoom {
-        let mut map : HashMap<String,String> = HashMap::new();
-        let request_url = self.info.server_name.clone();
+        let map : HashMap<String,String> = HashMap::new();
         
         let mut res = self.client.post(
             &format!("{}{}{}{}{}",
@@ -196,7 +195,7 @@ impl MatrixRoom {
         map.insert("msgtype".to_owned() , "m.text".to_owned());
         map.insert("body".to_owned() , message);
     
-        let mut res = self.client.put(
+        self.client.put(
             &format!("{}/_matrix/client/r0/rooms/{}/send/m.room.message/{}?access_token={}",
                      self.info.server_name,                     
                      utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
