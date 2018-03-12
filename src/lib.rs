@@ -60,6 +60,24 @@ define_encode_set! {
     }
 }
 
+pub enum Message {
+    Text(String),
+    Emote(String),
+    Notice(String),
+    Image{ body: String, url: String},
+    File{ body: String, url: String},
+    Location{ body: String, geo_uri: String},
+    Video{ body: String, url: String},
+    Audio{ body: String, url: String}
+}
+
+pub enum RoomEvent {
+    Message(Message),
+    Name(String),
+    Topic(String),
+    Avatar{ url: String},
+}
+
 impl MatrixHomeserver {
     pub fn new(info : ServerInfo) -> Self {
         MatrixHomeserver {
@@ -114,7 +132,7 @@ impl MatrixHomeserver {
             }
         }
     }
-    pub fn join(&self, room_name : String) -> MatrixRoom {
+    pub fn join_room(&self, room_name : String) -> Option<MatrixRoom> {
         let map : HashMap<String,String> = HashMap::new();
         
         let mut res = self.client.post(
@@ -127,13 +145,16 @@ impl MatrixHomeserver {
             .json(&map)
             .send()
             .unwrap();
-        let info: JoinInfo = res.json().unwrap();
-        MatrixRoom {
-            id: info.room_id,
-            latest_since: None,
-            client : self.client.clone(),
-            info : self.info.clone(),
-        }            
+        let info: Result<JoinInfo, _> = res.json();
+        match info {
+            Ok(info) => Some(MatrixRoom {
+                id: info.room_id,
+                latest_since: None,
+                client : self.client.clone(),
+                info : self.info.clone(),
+            }),
+            _ => None
+        }        
     }
     pub fn create_room(&self, room_name : String) -> Option<MatrixRoom> {
         let mut map : HashMap<String,String> = HashMap::new();
@@ -164,15 +185,13 @@ impl MatrixHomeserver {
 extern crate rand;
 
 impl MatrixRoom {
-    pub fn get_new_messages(&mut self) -> Vec<String> {
+    pub fn get_new_messages(&mut self) -> Vec<RoomEvent> {
         match self.latest_since.clone() {
             None => {    
                 let mut res = self.client.get(
-                    &format!("{}{}{}{}{}",
+                    &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[\"{}\"],\"timeline\":{{\"limit\":1}}}}}}&access_token={}",
                              self.info.server_name,
-                             "/_matrix/client/r0/sync?filter={\"room\":{\"rooms\":[\"",
                              utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
-                             "\"],\"timeline\":{\"limit\":1}}}&access_token=",
                              utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
                     .send()
                     .unwrap();
@@ -183,13 +202,10 @@ impl MatrixRoom {
             },
             Some(since) => {
                 let mut res = self.client.get(
-                    &format!("{}{}{}{}{}{}{}",
+                    &format!("{}/_matrix/client/r0/sync?since={}&filter={{\"room\":{{\"rooms\":[\"{}\"]}}}}&access_token={}",
                              self.info.server_name,
-                             "/_matrix/client/r0/sync?since=",
                              since,
-                             "&filter={\"room\":{\"rooms\":[\"",
                              utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
-                             "\"]}}&access_token=",
                              utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
                     .send()
                     .unwrap();
@@ -201,7 +217,7 @@ impl MatrixRoom {
                     Some(eventlist) =>               
                         for event in eventlist {
                             match event["content"]["msgtype"].as_str() {
-                                Some("m.text") => vec.push(event["content"]["body"].as_str().unwrap().to_owned()),
+                                Some("m.text") => vec.push(RoomEvent::Message(Message::Text(event["content"]["body"].as_str().unwrap().to_owned()))),
                                 _ => ()
                             }
                         },
