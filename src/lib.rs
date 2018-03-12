@@ -218,6 +218,23 @@ impl MatrixRoom {
                         for event in eventlist {
                             match event["content"]["msgtype"].as_str() {
                                 Some("m.text") => vec.push(RoomEvent::Message(Message::Text(event["content"]["body"].as_str().unwrap().to_owned()))),
+                                Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(event["content"]["body"].as_str().unwrap().to_owned()))),
+                                Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(event["content"]["body"].as_str().unwrap().to_owned()))),
+                                Some("m.image") => vec.push(RoomEvent::Message(Message::Image
+                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                                Some("m.file") => vec.push(RoomEvent::Message(Message::File
+                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                                Some("m.location") => vec.push(RoomEvent::Message(Message::Location
+                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                      geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned() })),
+                                Some("m.video") => vec.push(RoomEvent::Message(Message::Audio
+                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                                Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio
+                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
                                 _ => ()
                             }
                         },
@@ -229,11 +246,25 @@ impl MatrixRoom {
         }
             
     }
-    pub fn send_message(&self, message: String ) {
+    pub fn send_message(&self, message: Message) {
         let mut map : HashMap<String,String> = HashMap::new();
-        
-        map.insert("msgtype".to_owned() , "m.text".to_owned());
-        map.insert("body".to_owned() , message);
+
+        match message {
+            Message::Text(text) => {
+                map.insert("msgtype".to_owned() , "m.text".to_owned());
+                map.insert("body".to_owned() , text);
+            },
+            Message::Emote(text) => {
+                map.insert("msgtype".to_owned() , "m.emote".to_owned());
+                map.insert("body".to_owned() , text);
+            },
+            Message::Notice(text) => {
+                map.insert("msgtype".to_owned() , "m.notice".to_owned());
+                map.insert("body".to_owned() , text);
+            },
+            _ => ()
+        }
+
     
         self.client.put(
             &format!("{}/_matrix/client/r0/rooms/{}/send/m.room.message/{}?access_token={}",
