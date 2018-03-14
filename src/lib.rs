@@ -185,6 +185,19 @@ impl MatrixHomeserver {
 extern crate rand;
 
 impl MatrixRoom {
+    /// Receive all new events in a room since the last time this function has
+    /// been called
+    ///
+    /// The first time this function is called, since there is no last time,
+    /// only general information about the room is encoded in the events.
+    /// In all later calls, the new messages are included.
+    ///
+    /// Note: To prevent prevent infinite-loop situations between bots, a bot
+    /// should never reply to a message of type `notice` and should only reply
+    /// with messages of type `notice`.
+    ///
+    /// # Examples
+    ///
     pub fn get_new_messages(&mut self) -> Vec<RoomEvent> {
         match self.latest_since.clone() {
             None => {    
@@ -193,12 +206,16 @@ impl MatrixRoom {
                              self.info.server_name,
                              utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
                              utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
-                    .send()
-                    .unwrap();
-                //println!("{}",res.text().unwrap());
-                let info: SinceInfo = res.json().unwrap();
-                self.latest_since = Some(info.next_batch);
+                    .send();
+                match res {
+                    Ok(mut res) => {
+                        let info: SinceInfo = res.json().unwrap();
+                        self.latest_since = Some(info.next_batch);
+                    },
+                    _ => ()
+                }
                 Vec::new()
+                //println!("{}",res.text().unwrap());
             },
             Some(since) => {
                 let mut res = self.client.get(
@@ -207,45 +224,69 @@ impl MatrixRoom {
                              since,
                              utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
                              utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
-                    .send()
-                    .unwrap();
-                let mut vec = Vec::new();
-
-                let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
-                self.latest_since = Some(v["next_batch"].as_str().unwrap().to_owned());
-                match v["rooms"]["join"][&self.id]["timeline"]["events"].as_array() {
-                    Some(eventlist) =>               
-                        for event in eventlist {
-                            match event["content"]["msgtype"].as_str() {
-                                Some("m.text") => vec.push(RoomEvent::Message(Message::Text(event["content"]["body"].as_str().unwrap().to_owned()))),
-                                Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(event["content"]["body"].as_str().unwrap().to_owned()))),
-                                Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(event["content"]["body"].as_str().unwrap().to_owned()))),
-                                Some("m.image") => vec.push(RoomEvent::Message(Message::Image
-                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                    .send();
+                match res {
+                    Ok(mut res) => {
+                        let mut vec = Vec::new();
+                        
+                        let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
+                        self.latest_since = Some(v["next_batch"].as_str().unwrap().to_owned());
+                        match v["rooms"]["join"][&self.id]["timeline"]["events"].as_array() {
+                            Some(eventlist) =>               
+                                for event in eventlist {
+                                    match event["content"]["msgtype"].as_str() {
+                                        Some("m.text") => vec.push(RoomEvent::Message(Message::Text(event["content"]["body"].as_str().unwrap().to_owned()))),
+                                        Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(event["content"]["body"].as_str().unwrap().to_owned()))),
+                                        Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(event["content"]["body"].as_str().unwrap().to_owned()))),
+                                        Some("m.image") => vec.push(RoomEvent::Message(Message::Image
+                                                                                       { body: event["content"]["body"].as_str().unwrap().to_owned(),
                                       url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                Some("m.file") => vec.push(RoomEvent::Message(Message::File
-                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                Some("m.location") => vec.push(RoomEvent::Message(Message::Location
-                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                      geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned() })),
-                                Some("m.video") => vec.push(RoomEvent::Message(Message::Audio
-                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio
-                                    { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                _ => ()
-                            }
-                        },
-                    _ => ()
+                                        Some("m.file") => vec.push(RoomEvent::Message(Message::File
+                                                                                      { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                                        url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                                        Some("m.location") => vec.push(RoomEvent::Message(Message::Location
+                                                                                          { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                                            geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned() })),
+                                        Some("m.video") => vec.push(RoomEvent::Message(Message::Audio
+                                                                                       { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                                         url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                                        Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio
+                                                                                       { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                                         url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                                        _ => ()
+                                    }
+                                },
+                            _ => ()
+                        }
+                        
+                        vec
+                    },
+                    _ => Vec::new()
                 }
-
-                vec
             }
         }
             
     }
+
+    /// Send a message to a room
+    ///
+    /// Note: To prevent prevent infinite-loop situations between bots, a bot
+    /// should never reply to messages with a message of type `text`.
+    /// Instead, a message of type `notice` should be used.
+    /// Thus, a bot should also never reply to a message of type `notice`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let message = Message::Notice("Hallo".to_owned());
+    /// room.send_message(message);
+    /// ```
+    ///
+    /// ```
+    /// let logo_url = String::from("https://www.rust-lang.org/logos/rust-logo-128x128.png");
+    /// let message = Message::Image{body: "Rust Logo".to_owned(), url: logo_url};
+    /// room.send_message(message);
+    /// ```
     pub fn send_message(&self, message: Message) {
         let mut map : HashMap<String,String> = HashMap::new();
 
@@ -299,12 +340,51 @@ impl MatrixRoom {
             .unwrap();
     }
 
+    /// Send a message of type `text` to a room
+    ///
+    /// Shortcut for `send_message(Message::Text(…))``
+    ///
+    /// A bot should never reply to messages with a message of type `text`.
+    /// Instead, a message of type `notice` should be used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// room.send_text("Hallo".to_owned());
+    /// ```
     pub fn send_text(&self, text: String) {
         self.send_message(Message::Text(text));
     }
+    /// Send a message of type `emote` to a room
+    ///
+    /// Shortcut for `send_message(Message::Emote(…))``
+    ///
+    /// An emote describes an action that is being performed.
+    /// This corresponds to the IRC CTCP ACTION command and is usually induced
+    /// by the prefix `/me`.
+    /// 
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// room.send_emote("is having trouble".to_owned());
+    /// ```
     pub fn send_emote(&self, text: String) {
         self.send_message(Message::Emote(text));
     }
+    
+    /// Send a message of type `notice` to a room
+    ///
+    /// Shortcut for `send_message(Message::Notice(…))``
+    ///
+    /// A bot should always use a message of type `notice`, when replying to
+    /// messages.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// room.send_notice("Hallo".to_owned());
+    /// ```
     pub fn send_notice(&self, text: String) {
         self.send_message(Message::Notice(text));
     }
