@@ -287,9 +287,7 @@ impl MatrixRoom {
                 map.insert("body".to_owned() , body);
                 map.insert("url".to_owned() , url);
             },
-        }
-
-    
+        }    
         self.client.put(
             &format!("{}/_matrix/client/r0/rooms/{}/send/m.room.message/{}?access_token={}",
                      self.info.server_name,                     
@@ -299,6 +297,16 @@ impl MatrixRoom {
             .json(&map)
             .send()
             .unwrap();
+    }
+
+    pub fn send_text(&self, text: String) {
+        self.send_message(Message::Text(text));
+    }
+    pub fn send_emote(&self, text: String) {
+        self.send_message(Message::Emote(text));
+    }
+    pub fn send_notice(&self, text: String) {
+        self.send_message(Message::Notice(text));
     }
 }
 
