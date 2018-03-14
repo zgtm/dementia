@@ -342,7 +342,7 @@ impl MatrixRoom {
 
     /// Send a message of type `text` to a room
     ///
-    /// Shortcut for `send_message(Message::Text(…))``
+    /// Shortcut for `send_message(Message::Text(…))`
     ///
     /// A bot should never reply to messages with a message of type `text`.
     /// Instead, a message of type `notice` should be used.
@@ -357,7 +357,7 @@ impl MatrixRoom {
     }
     /// Send a message of type `emote` to a room
     ///
-    /// Shortcut for `send_message(Message::Emote(…))``
+    /// Shortcut for `send_message(Message::Emote(…))`
     ///
     /// An emote describes an action that is being performed.
     /// This corresponds to the IRC CTCP ACTION command and is usually induced
@@ -375,7 +375,7 @@ impl MatrixRoom {
     
     /// Send a message of type `notice` to a room
     ///
-    /// Shortcut for `send_message(Message::Notice(…))``
+    /// Shortcut for `send_message(Message::Notice(…))`
     ///
     /// A bot should always use a message of type `notice`, when replying to
     /// messages.
