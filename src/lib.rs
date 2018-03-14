@@ -262,7 +262,31 @@ impl MatrixRoom {
                 map.insert("msgtype".to_owned() , "m.notice".to_owned());
                 map.insert("body".to_owned() , text);
             },
-            _ => ()
+            Message::Image{body, url} => {
+                map.insert("msgtype".to_owned() , "m.image".to_owned());
+                map.insert("body".to_owned() , body);
+                map.insert("url".to_owned() , url);
+            },
+            Message::File{body, url} => {
+                map.insert("msgtype".to_owned() , "m.image".to_owned());
+                map.insert("body".to_owned() , body);
+                map.insert("url".to_owned() , url);
+            },
+            Message::Location{body, geo_uri} => {
+                map.insert("msgtype".to_owned() , "m.image".to_owned());
+                map.insert("body".to_owned() , body);
+                map.insert("geo_uri".to_owned() , geo_uri);
+            },
+            Message::Audio{body, url} => {
+                map.insert("msgtype".to_owned() , "m.image".to_owned());
+                map.insert("body".to_owned() , body);
+                map.insert("url".to_owned() , url);
+            },
+            Message::Video{body, url} => {
+                map.insert("msgtype".to_owned() , "m.image".to_owned());
+                map.insert("body".to_owned() , body);
+                map.insert("url".to_owned() , url);
+            },
         }
 
     
