@@ -1,3 +1,15 @@
+//! A module for writing Matrix bots
+//!
+//! This module maps some parts of the Matrix client-server protocoll to rust
+//! objects.
+//! In order to communicate with the Matrix homeserver, this library needs an
+//! authentication token (`access_token`).
+//! This authentication token can either be given directly, or can be generated
+//! using username-password authentication, if the homeserver supports this.
+//! With this authentication token, rooms can be joined or created.
+//! After as room has been joined, messages can be sent to the room and new
+//! messages can be fetched from from the room.
+
 #[macro_use]
 extern crate serde_derive;
 extern crate reqwest;
@@ -5,9 +17,17 @@ extern crate serde_json;
 #[macro_use]
 extern crate url;
 
+use std::rc::Rc;
+use std::collections::HashMap;
 use serde_json::{Value};
 
-use std::collections::HashMap;
+use url::percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET,  PATH_SEGMENT_ENCODE_SET};
+define_encode_set! {
+    pub ACCESS_TOKEN_ENCODE_SET = [USERINFO_ENCODE_SET] | {
+        '%', '&'
+    }
+}
+
 
 #[derive(Deserialize, Debug)]
 struct JoinInfo {
@@ -24,22 +44,34 @@ struct AccesstokenInfo {
     access_token: String,
 }
 
+/// The information needed to connect to a homeserver using username-password
+/// authentication
 #[derive(Deserialize, Debug)]
 pub struct LoginInfo {
+    /// The homeserver URL without trailing slash, e. g. `https://matrix.org`
     pub server_name: String,
+    /// The username without homeserver part, e. g. `bot`
     pub username: String,
+    /// The password
     pub password: String,
 }
 
+/// The information needed to connect to a homeseverer with an access token
 #[derive(Deserialize, Debug, Clone)]
 pub struct ServerInfo {
+    /// The homeserver URL without trailing slash, e. g. `https://matrix.org`
     pub server_name: String,
+    /// The access token
     pub access_token: String,
 }
 
+/// Represents a Matrix homeserver to which an access token has been created
+pub struct MatrixHomeserver {
+    client : Rc<reqwest::Client>,
+    info: ServerInfo,
+}
 
-use std::rc::Rc;
-
+/// Represents a Matrix room from which events can be fetched from
 pub struct MatrixRoom {
     id: String,
     latest_since: Option<String>,
@@ -47,44 +79,59 @@ pub struct MatrixRoom {
     info : ServerInfo,
 }
 
-pub struct MatrixHomeserver {
-    client : Rc<reqwest::Client>,
-    info: ServerInfo,
-}
-
-use url::percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET,  PATH_SEGMENT_ENCODE_SET};
-
-define_encode_set! {
-    pub ACCESS_TOKEN_ENCODE_SET = [USERINFO_ENCODE_SET] | {
-        '%', '&'
-    }
-}
-
+/// A message received from or to be sent to a room
 pub enum Message {
+    /// Text message. Should not be used to reply to messages!
     Text(String),
+    /// Emote. Represents an action.
     Emote(String),
+    /// Notice. Should be used for automatic replies. Should not be replied to!
     Notice(String),
+    /// Image file. The URL should be created by uploading to the homesever.
     Image{ body: String, url: String},
+    /// File. The URL should be created by uploading to the homesever.
     File{ body: String, url: String},
+    /// Location. `geo_uri` should be a Geo URI.
+    /// E. g. `geo:37.786971,-122.399677`.
     Location{ body: String, geo_uri: String},
+    /// Video file. The URL should be created by uploading to the homesever.
     Video{ body: String, url: String},
+    /// Audio file. The URL should be created by uploading to the homesever.
     Audio{ body: String, url: String}
 }
 
+/// An event received from or to be sent to a room
 pub enum RoomEvent {
+    /// A message in the room.
     Message(Message),
+    /// The name of the room.
     Name(String),
+    /// The topice of the room.
     Topic(String),
+    /// The avatar (an image) of the room.
     Avatar{ url: String},
 }
 
 impl MatrixHomeserver {
+    /// Create a new Homeserver object
+    ///
+    /// This does not create a stateful connection.
+    /// It only constructs a `request` object and saves the URL of the Homeserver.
     pub fn new(info : ServerInfo) -> Self {
         MatrixHomeserver {
             client : Rc::new(reqwest::Client::new()),
             info: info
         }
     }
+
+    /// Create a new Homeserver object from username an password combination
+    ///
+    /// This does not create a stateful connection.
+    /// It only constructs a `request` object and saves the URL of the Homeserver.
+    ///
+    /// # Panics
+    /// If the server does not support or allow simple username and password
+    /// login, this function panics.
     pub fn login(info : LoginInfo) -> Self {
         let client = reqwest::Client::new();
 
@@ -132,6 +179,14 @@ impl MatrixHomeserver {
             }
         }
     }
+
+    /// Creates a Matrix room object
+    ///
+    /// This joins the room.
+    /// If the room has already been joined, this function can be called anyway
+    /// to only create the room object.
+    ///
+    /// If the room cannot be joined, `None` is returned
     pub fn join_room(&self, room_name : String) -> Option<MatrixRoom> {
         let map : HashMap<String,String> = HashMap::new();
         
@@ -156,6 +211,13 @@ impl MatrixHomeserver {
             _ => None
         }        
     }
+
+    /// Creates a new Matrix room on the server and returns a Matrix room object
+    ///
+    /// The room will be created with the preset `public_chat`.
+    /// Thus, everyone can join the room.
+    ///
+    /// If the room cannot be created or already exists, `None` is returned.
     pub fn create_room(&self, room_name : String) -> Option<MatrixRoom> {
         let mut map : HashMap<String,String> = HashMap::new();
         
