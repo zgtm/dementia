@@ -246,6 +246,9 @@ impl MatrixHomeserver {
         }
     }
 
+    /// Get all current invites from the server
+    ///
+    /// Returns a list of all room, the bot has been invited to.
     pub fn get_invites(&mut self) -> Vec<String> {
         let mut res = self.client.get(
             &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[]}}}}&access_token={}",
