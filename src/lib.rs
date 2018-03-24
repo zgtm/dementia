@@ -245,6 +245,37 @@ impl MatrixHomeserver {
             _ => None
         }
     }
+
+    pub fn get_invites(&mut self) -> Vec<String> {
+        let mut res = self.client.get(
+            &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[]}}}}&access_token={}",
+                     self.info.server_name,
+                     utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
+            .send();
+
+        // println!("{}",&res.unwrap().text().unwrap());
+        // return 
+        
+        match res {
+            Ok(mut res) => {
+                let mut vec = Vec::new();
+                
+                let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
+                match v["rooms"]["invite"].as_object() {
+                    Some(invitelist) => for (room, info) in invitelist {
+                        for event in info["invite_state"]["events"].as_array().unwrap() {
+                            if event["membership"].as_str() == Some("invite") {
+                                vec.push(room.to_owned());
+                            }
+                        }
+                    }
+                    _ => ()
+                }
+                vec
+            }          
+            _ => Vec::new()
+        }
+    }
 }
 
 extern crate rand;
@@ -264,74 +295,64 @@ impl MatrixRoom {
     /// # Examples
     ///
     pub fn get_new_messages(&mut self) -> Vec<RoomEvent> {
-        match self.latest_since.clone() {
-            None => {    
-                let mut res = self.client.get(
-                    &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[\"{}\"],\"timeline\":{{\"limit\":1}}}}}}&access_token={}",
-                             self.info.server_name,
-                             utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
-                             utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
-                    .send();
-                match res {
-                    Ok(mut res) => {
-                        let info: SinceInfo = res.json().unwrap();
-                        self.latest_since = Some(info.next_batch);
+        let mut res = match self.latest_since.clone() {
+            None => self.client.get(
+                &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[\"{}\"],\"timeline\":{{\"limit\":0}}}}}}&access_token={}",
+                         self.info.server_name,
+                         utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
+                         utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
+                .send(),
+            Some(since) => self.client.get(
+                &format!("{}/_matrix/client/r0/sync?since={}&filter={{\"room\":{{\"rooms\":[\"{}\"]}}}}&access_token={}",
+                         self.info.server_name,
+                         since,
+                         utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
+                         utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
+                .send()
+        };
+
+        //println!("{}",&res.unwrap().text().unwrap());
+        //return Vec::new();
+        
+        match res {
+            Ok(mut res) => {
+                let mut vec = Vec::new();
+                
+                let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
+                self.latest_since = Some(v["next_batch"].as_str().unwrap().to_owned());
+                match v["rooms"]["join"][&self.id]["timeline"]["events"].as_array() {
+                    Some(eventlist) => for event in eventlist {
+                        match event["content"]["msgtype"].as_str() {
+                            Some("m.text") => vec.push(RoomEvent::Message(Message::Text(event["content"]["body"].as_str().unwrap().to_owned()))),
+                            Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(event["content"]["body"].as_str().unwrap().to_owned()))),
+                            Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(event["content"]["body"].as_str().unwrap().to_owned()))),
+                            Some("m.image") => vec.push(RoomEvent::Message(Message::Image
+                                                                           { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                             url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                            Some("m.file") => vec.push(RoomEvent::Message(Message::File
+                                                                          { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                            url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                            Some("m.location") => vec.push(RoomEvent::Message(Message::Location
+                                                                              { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                                geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned() })),
+                            Some("m.video") => vec.push(RoomEvent::Message(Message::Audio
+                                                                           { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                             url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                            Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio
+                                                                           { body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                                                             url: event["content"]["url"].as_str().unwrap().to_owned() })),
+                            _ => ()
+                        }
                     },
                     _ => ()
                 }
-                Vec::new()
-                //println!("{}",res.text().unwrap());
+                
+                vec
             },
-            Some(since) => {
-                let mut res = self.client.get(
-                    &format!("{}/_matrix/client/r0/sync?since={}&filter={{\"room\":{{\"rooms\":[\"{}\"]}}}}&access_token={}",
-                             self.info.server_name,
-                             since,
-                             utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
-                             utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
-                    .send();
-                match res {
-                    Ok(mut res) => {
-                        let mut vec = Vec::new();
-                        
-                        let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
-                        self.latest_since = Some(v["next_batch"].as_str().unwrap().to_owned());
-                        match v["rooms"]["join"][&self.id]["timeline"]["events"].as_array() {
-                            Some(eventlist) =>               
-                                for event in eventlist {
-                                    match event["content"]["msgtype"].as_str() {
-                                        Some("m.text") => vec.push(RoomEvent::Message(Message::Text(event["content"]["body"].as_str().unwrap().to_owned()))),
-                                        Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(event["content"]["body"].as_str().unwrap().to_owned()))),
-                                        Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(event["content"]["body"].as_str().unwrap().to_owned()))),
-                                        Some("m.image") => vec.push(RoomEvent::Message(Message::Image
-                                                                                       { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                      url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                        Some("m.file") => vec.push(RoomEvent::Message(Message::File
-                                                                                      { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                                        url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                        Some("m.location") => vec.push(RoomEvent::Message(Message::Location
-                                                                                          { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                                            geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned() })),
-                                        Some("m.video") => vec.push(RoomEvent::Message(Message::Audio
-                                                                                       { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                                         url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                        Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio
-                                                                                       { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                                         url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                                        _ => ()
-                                    }
-                                },
-                            _ => ()
-                        }
-                        
-                        vec
-                    },
-                    _ => Vec::new()
-                }
-            }
+            _ => Vec::new()
         }
-            
     }
+
 
     /// Send a message to a room
     ///
