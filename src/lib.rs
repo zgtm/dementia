@@ -405,6 +405,22 @@ impl MatrixRoom {
             .unwrap();
     }
 
+    /// Invite someone to a room
+    ///
+    /// * `user_id` – The fully qualified user ID of the invitee.
+    pub fn invite(&self, user_id: &str) {
+        let mut map : HashMap<&str, &str> = HashMap::new();
+        map.insert("user_id", user_id);
+        self.client.put(
+            &format!("{}/_matrix/client/r0/rooms/{}/invite?access_token={}",
+                     self.info.server_name,                     
+                     utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
+                     utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string())) 
+            .json(&map)
+            .send()
+            .unwrap();
+    }
+    
     
     /// Send a message of type `text` to a room
     ///
