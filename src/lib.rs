@@ -44,25 +44,14 @@ struct AccesstokenInfo {
     access_token: String,
 }
 
-/// The information needed to connect to a homeserver using username-password
-/// authentication
-#[derive(Deserialize, Debug)]
-pub struct LoginInfo {
-    /// The homeserver URL without trailing slash, e. g. `https://matrix.org`
-    pub server_name: String,
-    /// The username without homeserver part, e. g. `bot`
-    pub username: String,
-    /// The password
-    pub password: String,
-}
 
 /// The information needed to connect to a homeseverer with an access token
 #[derive(Deserialize, Debug, Clone)]
-pub struct ServerInfo {
+struct ServerInfo {
     /// The homeserver URL without trailing slash, e. g. `https://matrix.org`
-    pub server_name: String,
+    server_name: String,
     /// The access token
-    pub access_token: String,
+    access_token: String,
 }
 
 /// Represents a Matrix homeserver to which an access token has been created
@@ -88,16 +77,16 @@ pub enum Message {
     /// Notice. Should be used for automatic replies. Should not be replied to!
     Notice(String),
     /// Image file. The URL should be created by uploading to the homesever.
-    Image{ body: String, url: String},
+    Image{body:String, url:String},
     /// File. The URL should be created by uploading to the homesever.
-    File{ body: String, url: String},
+    File{body:String, url:String},
     /// Location. `geo_uri` should be a Geo URI.
     /// E. g. `geo:37.786971,-122.399677`.
-    Location{ body: String, geo_uri: String},
+    Location{body:String, geo_uri:String},
     /// Video file. The URL should be created by uploading to the homesever.
-    Video{ body: String, url: String},
+    Video{body:String, url:String},
     /// Audio file. The URL should be created by uploading to the homesever.
-    Audio{ body: String, url: String}
+    Audio{body:String, url:String}
 }
 
 /// An event received from or to be sent to a room
@@ -109,7 +98,7 @@ pub enum RoomEvent {
     /// The topice of the room.
     Topic(String),
     /// The avatar (an image) of the room.
-    Avatar{ url: String},
+    Avatar{url:String},
 }
 
 impl MatrixHomeserver {
@@ -117,10 +106,13 @@ impl MatrixHomeserver {
     ///
     /// This does not create a stateful connection.
     /// It only constructs a `request` object and saves the URL of the Homeserver.
-    pub fn new(info : ServerInfo) -> Self {
+    ///
+    /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
+    /// * `access_token` – The access token
+    pub fn new(server_name : &str, access_token : &str) -> Self {
         MatrixHomeserver {
             client : Rc::new(reqwest::Client::new()),
-            info: info
+            info: ServerInfo { server_name: server_name.to_owned(), access_token: access_token.to_owned() }
         }
     }
 
@@ -129,15 +121,18 @@ impl MatrixHomeserver {
     /// This does not create a stateful connection.
     /// It only constructs a `request` object and saves the URL of the Homeserver.
     ///
+    /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
+    /// * `username` – The username without homeserver part, e. g. `bot`
+    /// * `password` – The password
+    ///
     /// # Panics
     /// If the server does not support or allow simple username and password
     /// login, this function panics.
-    pub fn login(info : LoginInfo) -> Self {
+    pub fn login(server_name:&str, username:&str, password:&str) -> Self {
         let client = reqwest::Client::new();
 
         let mut res = client.get(
-            &format!("{}/_matrix/client/r0/login",
-                     info.server_name))
+            &format!("{}/_matrix/client/r0/login", server_name))
             .send()
             .unwrap();
 
@@ -156,15 +151,15 @@ impl MatrixHomeserver {
         }
         if !pwlogin {panic!("Passwort-Login nicht möglich")}
 
-        let mut map : HashMap<String,String> = HashMap::new();
+        let mut map : HashMap<&str, &str> = HashMap::new();
 
-        map.insert("type".to_owned() , "m.login.password".to_owned());
-        map.insert("user".to_owned() , info.username);
-        map.insert("password".to_owned() , info.password);
+        map.insert("type", "m.login.password");
+        map.insert("user", &username);
+        map.insert("password", &password);
     
         let mut res = client.post(
             &format!("{}/_matrix/client/r0/login",
-                     info.server_name))
+                     server_name))
             .json(&map)
             .send()
             .unwrap();
@@ -174,10 +169,18 @@ impl MatrixHomeserver {
         MatrixHomeserver {
             client : Rc::new(client),
             info: ServerInfo {
-                server_name: info.server_name,
+                server_name: server_name.to_owned(),
                 access_token: at_info.access_token,
             }
         }
+    }
+
+    /// Returns the access token
+    ///
+    /// This is especially usefull, if you authenticated via username and
+    /// password and want to retrieve the access token for later use.
+    pub fn get_access_token(&self) -> String {
+        return self.info.access_token.clone();
     }
 
     /// Creates a Matrix room object
@@ -402,6 +405,7 @@ impl MatrixRoom {
             .unwrap();
     }
 
+    
     /// Send a message of type `text` to a room
     ///
     /// Shortcut for `send_message(Message::Text(…))`
