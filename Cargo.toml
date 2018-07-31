@@ -1,10 +1,11 @@
 [package]
 name = "dementia"
-version = "0.0.3"
+version = "0.0.4-pre1"
 authors = ["Robert Czechowski <robert+git@czecho.de>"]
-description = "A small client library for the Matrix protocoll"
+description = "A small client library for the Matrix protocol"
 license="Apache-2.0/GPL-3.0"
-keywords = ["matrix", "chat", "protocoll", "riot"]
+keywords = ["matrix", "chat", "protocol", "riot"]
+categories = ["api-bindings", "network-programming"]
 readme = "readme.md"
 repository = "https://github.com/zgtm/dementia"
 
