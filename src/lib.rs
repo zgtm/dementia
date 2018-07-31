@@ -54,14 +54,21 @@ struct ServerInfo {
     access_token: String,
 }
 
+pub struct HomeserverBuilder<Username,Password,AccessToken> {
+    server: String,
+    username: Username,
+    password: Password,
+    access_token: AccessToken,
+}
+
 /// Represents a Matrix homeserver to which an access token has been created
-pub struct MatrixHomeserver {
+pub struct Homeserver {
     client : Rc<reqwest::Client>,
     info: ServerInfo,
 }
 
 /// Represents a Matrix room from which events can be fetched from
-pub struct MatrixRoom {
+pub struct Room {
     id: String,
     latest_since: Option<String>,
     client : Rc<reqwest::Client>,
@@ -101,21 +108,47 @@ pub enum RoomEvent {
     Avatar{url:String},
 }
 
-impl MatrixHomeserver {
-    /// Create a new Homeserver object
-    ///
-    /// This does not create a stateful connection.
-    /// It only constructs a `request` object and saves the URL of the Homeserver.
-    ///
-    /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
-    /// * `access_token` – The access token
-    pub fn new(server_name : &str, access_token : &str) -> Self {
-        MatrixHomeserver {
-            client : Rc::new(reqwest::Client::new()),
-            info: ServerInfo { server_name: server_name.to_owned(), access_token: access_token.to_owned() }
+
+
+impl HomeserverBuilder<(), (), ()> {
+    /// Set the access token
+    pub fn access_token(self, access_token : &str) -> HomeserverBuilder<(), (), String> {
+        HomeserverBuilder {
+            server: self.server,
+            username: self.username,
+            password: self.password,
+            access_token: access_token.to_owned(),
         }
     }
+}
 
+impl<T> HomeserverBuilder<(), T, ()> {
+    /// Set the username 
+    pub fn username(self, username : &str) -> HomeserverBuilder<String, T, ()> {
+        HomeserverBuilder {
+            server: self.server,
+            username: username.to_owned(),
+            password: self.password,
+            access_token: (),
+        }
+    }
+}
+
+impl<T> HomeserverBuilder<T, (), ()> {
+    /// Set the password 
+    pub fn password(self, password : &str) -> HomeserverBuilder<T, String, ()> {
+        HomeserverBuilder {
+            server: self.server,
+            username: self.username,
+            password: password.to_owned(),
+            access_token: (),
+        }
+    }
+}
+
+impl HomeserverBuilder<String, String, ()> {
+    /// Log in with the given credentials
+    ///
     /// Create a new Homeserver object from username an password combination
     ///
     /// This does not create a stateful connection.
@@ -128,51 +161,114 @@ impl MatrixHomeserver {
     /// # Panics
     /// If the server does not support or allow simple username and password
     /// login, this function panics.
-    pub fn login(server_name:&str, username:&str, password:&str) -> Self {
-        let client = reqwest::Client::new();
+    pub fn login(self) -> HomeserverBuilder<String, String, String> {
 
-        let mut res = client.get(
-            &format!("{}/_matrix/client/r0/login", server_name))
-            .send()
-            .unwrap();
+        let at_info: AccesstokenInfo = {
+            let client = reqwest::Client::new();
 
-        let mut pwlogin : bool = false;
-        
-        let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
-        match v["flows"].as_array() {
-             Some(flowlist) =>               
-                for flow in flowlist {
-                    match flow["type"].as_str() {
-                        Some("m.login.password") => {println!("Found login option `m.login.password`"); pwlogin = true;}
-                        _ => ()
-                    }
-                },
-            _ => ()
-        }
-        if !pwlogin {panic!("Passwort-Login nicht möglich")}
+            let mut res = client.get(
+                &format!("{}/_matrix/client/r0/login", self.server))
+                .send()
+                .unwrap();
 
-        let mut map : HashMap<&str, &str> = HashMap::new();
-
-        map.insert("type", "m.login.password");
-        map.insert("user", &username);
-        map.insert("password", &password);
-    
-        let mut res = client.post(
-            &format!("{}/_matrix/client/r0/login",
-                     server_name))
-            .json(&map)
-            .send()
-            .unwrap();
-
-        //println!("{}",res.text().unwrap());
-        let at_info: AccesstokenInfo = res.json().unwrap();
-        MatrixHomeserver {
-            client : Rc::new(client),
-            info: ServerInfo {
-                server_name: server_name.to_owned(),
-                access_token: at_info.access_token,
+            let mut pwlogin : bool = false;
+            
+            let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
+            match v["flows"].as_array() {
+                Some(flowlist) =>               
+                    for flow in flowlist {
+                        match flow["type"].as_str() {
+                            Some("m.login.password") => {println!("Found login option `m.login.password`"); pwlogin = true;}
+                            _ => ()
+                        }
+                    },
+                _ => ()
             }
+            if !pwlogin {panic!("Server does not offer the login option `m.login.password`")}
+
+            let mut map : HashMap<&str, &str> = HashMap::new();
+
+            map.insert("type", "m.login.password");
+            map.insert("user", &self.username);
+            map.insert("password", &self.password);
+            
+            let mut res = client.post(
+                &format!("{}/_matrix/client/r0/login",
+                         self.server))
+                .json(&map)
+                .send()
+                .unwrap();
+
+            //println!("{}",res.text().unwrap());
+            res.json().unwrap()
+        };
+        
+        HomeserverBuilder {
+            server: self.server,
+            username: self.username,
+            password: self.password,
+            access_token: at_info.access_token,
         }
+    }
+}
+
+impl<T, R> HomeserverBuilder<T, R, String> {
+    pub fn connect(self) -> Homeserver {
+        Homeserver {
+            client : Rc::new(reqwest::Client::new()),
+            info: ServerInfo { server_name: self.server, access_token: self.access_token }
+        }
+    }
+}
+
+impl Homeserver {
+    /// Start creating a new Homeserver object
+    ///
+    /// This does not create a stateful connection.
+    /// It only constructs a `request` object and saves the URL of the Homeserver.
+    ///
+    /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
+    /// * `access_token` – The access token
+    pub fn new(server_url : &str) -> HomeserverBuilder<(),(),()> {
+        HomeserverBuilder {
+            server: server_url.to_owned(),
+            username: (),
+            password: (),
+            access_token: (),
+        }
+    }
+   
+    /// Create a new Homeserver object
+    ///
+    /// This does not create a stateful connection.
+    /// It only constructs a `request` object and saves the URL of the Homeserver.
+    ///
+    /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
+    /// * `access_token` – The access token
+    pub fn connect(server_url: &str, access_token: &str) -> Self {
+        Self::new(server_url)
+            .access_token(access_token)
+            .connect()
+    }
+    
+    /// Create a new Homeserver object from username an password combination
+    ///
+    /// This does not create a stateful connection.
+    /// It only constructs a `request` object and saves the URL of the Homeserver.
+    ///
+    /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
+    /// * `username` – The username without homeserver part, e. g. `bot`
+    /// * `password` – The password
+    ///
+    /// # Panics
+    /// If the server does not support or allow simple username and password
+    /// login, this function panics.
+    pub fn login_and_connect(server_url: &str, username: &str, password: &str) -> Self {
+        Self::new(server_url)
+            .username(username)
+            .password(password)
+            .login()
+            .connect()
     }
 
     /// Returns the access token
@@ -190,7 +286,7 @@ impl MatrixHomeserver {
     /// to only create the room object.
     ///
     /// If the room cannot be joined, `None` is returned
-    pub fn join_room(&self, room_name : String) -> Option<MatrixRoom> {
+    pub fn join_room(&self, room_name : String) -> Option<Room> {
         let map : HashMap<String,String> = HashMap::new();
         
         let mut res = self.client.post(
@@ -205,7 +301,7 @@ impl MatrixHomeserver {
             .unwrap();
         let info: Result<JoinInfo, _> = res.json();
         match info {
-            Ok(info) => Some(MatrixRoom {
+            Ok(info) => Some(Room {
                 id: info.room_id,
                 latest_since: None,
                 client : self.client.clone(),
@@ -221,7 +317,7 @@ impl MatrixHomeserver {
     /// Thus, everyone can join the room.
     ///
     /// If the room cannot be created or already exists, `None` is returned.
-    pub fn create_room(&self, room_name : String) -> Option<MatrixRoom> {
+    pub fn create_room(&self, room_name : String) -> Option<Room> {
         let mut map : HashMap<String,String> = HashMap::new();
         
         map.insert("room_alias_name".to_owned() , room_name);
@@ -236,7 +332,7 @@ impl MatrixHomeserver {
             .unwrap();
         let info: Result<JoinInfo, _> = res.json();
         match info {
-            Ok(info) => Some(MatrixRoom {
+            Ok(info) => Some(Room {
                 id: info.room_id,
                 latest_since: None,
                 client : self.client.clone(),
@@ -250,7 +346,7 @@ impl MatrixHomeserver {
     ///
     /// Returns a list of all room, the bot has been invited to.
     pub fn get_invites(&mut self) -> Vec<String> {
-        let mut res = self.client.get(
+        let res = self.client.get(
             &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[]}}}}&access_token={}",
                      self.info.server_name,
                      utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
@@ -283,7 +379,7 @@ impl MatrixHomeserver {
 
 extern crate rand;
 
-impl MatrixRoom {
+impl Room {
     /// Receive all new events in a room since the last time this function has
     /// been called
     ///
@@ -298,7 +394,7 @@ impl MatrixRoom {
     /// # Examples
     ///
     pub fn get_new_messages(&mut self) -> Vec<RoomEvent> {
-        let mut res = match self.latest_since.clone() {
+        let res = match self.latest_since.clone() {
             None => self.client.get(
                 &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[\"{}\"],\"timeline\":{{\"limit\":0}}}}}}&access_token={}",
                          self.info.server_name,
