@@ -80,9 +80,15 @@ fn main() {
 If you don't have an access token (yet) but the server supports password authentication, you can let the library generate its own access token:
 
 ```rust   
-    let connection =  Homeserver::new("https://matrix.org")
+    let connection = Homeserver::new("https://matrix.org")
         .username("@example:matrix.org")
         .password("examplepassword")
         .login()
         .connect();
+```
+
+Subsequentlty, you can retrieve the access token for future connections using
+
+```rust
+    access_token = connection.get_access_token();
 ```
