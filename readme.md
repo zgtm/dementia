@@ -19,7 +19,6 @@ In order to connect to a Matrix homeserver and join a room, you need a user on t
 ```rust
     let server_url = "https://matrix.org"; // The Matrix homeserver
     let access_token = "DAx…3wo";          // The Matrix user access token
-    };
 ```
 
 With that, you can create a Homeserver object
