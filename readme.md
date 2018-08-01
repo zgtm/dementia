@@ -50,13 +50,12 @@ You receive new messages with `connection.get_new_messages()` (which returns a `
 ```rust
 extern crate dementia;
 
-use dementia::{ServerInfo, LoginInfo, MatrixHomeserver, MatrixRoom};
+use dementia::{Homeserver, Room};
 use std::{thread, time};
 
 fn main() {
     let server_url = "https://matrix.org"; // The Matrix homeserver
     let access_token = "DAx…3wo";          // The Matrix user access token
-    };
 
     let conn = Homeserver::new(server_url)
         .access_token(access_token)
