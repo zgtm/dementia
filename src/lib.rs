@@ -17,17 +17,16 @@ extern crate serde_json;
 #[macro_use]
 extern crate url;
 
-use std::rc::Rc;
+use serde_json::Value;
 use std::collections::HashMap;
-use serde_json::{Value};
+use std::rc::Rc;
 
-use url::percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET,  PATH_SEGMENT_ENCODE_SET};
+use url::percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET, USERINFO_ENCODE_SET};
 define_encode_set! {
     pub ACCESS_TOKEN_ENCODE_SET = [USERINFO_ENCODE_SET] | {
         '%', '&'
     }
 }
-
 
 #[derive(Deserialize, Debug)]
 struct JoinInfo {
@@ -44,7 +43,6 @@ struct AccesstokenInfo {
     access_token: String,
 }
 
-
 /// The information needed to connect to a homeseverer with an access token
 #[derive(Deserialize, Debug, Clone)]
 struct ServerInfo {
@@ -54,7 +52,7 @@ struct ServerInfo {
     access_token: String,
 }
 
-pub struct HomeserverBuilder<Username,Password,AccessToken> {
+pub struct HomeserverBuilder<Username, Password, AccessToken> {
     server: String,
     username: Username,
     password: Password,
@@ -63,7 +61,7 @@ pub struct HomeserverBuilder<Username,Password,AccessToken> {
 
 /// Represents a Matrix homeserver to which an access token has been created
 pub struct Homeserver {
-    client : Rc<reqwest::Client>,
+    client: Rc<reqwest::Client>,
     info: ServerInfo,
 }
 
@@ -71,8 +69,8 @@ pub struct Homeserver {
 pub struct Room {
     id: String,
     latest_since: Option<String>,
-    client : Rc<reqwest::Client>,
-    info : ServerInfo,
+    client: Rc<reqwest::Client>,
+    info: ServerInfo,
 }
 
 /// A message received from or to be sent to a room
@@ -84,16 +82,16 @@ pub enum Message {
     /// Notice. Should be used for automatic replies. Should not be replied to!
     Notice(String),
     /// Image file. The URL should be created by uploading to the homesever.
-    Image{body:String, url:String},
+    Image { body: String, url: String },
     /// File. The URL should be created by uploading to the homesever.
-    File{body:String, url:String},
+    File { body: String, url: String },
     /// Location. `geo_uri` should be a Geo URI.
     /// E. g. `geo:37.786971,-122.399677`.
-    Location{body:String, geo_uri:String},
+    Location { body: String, geo_uri: String },
     /// Video file. The URL should be created by uploading to the homesever.
-    Video{body:String, url:String},
+    Video { body: String, url: String },
     /// Audio file. The URL should be created by uploading to the homesever.
-    Audio{body:String, url:String}
+    Audio { body: String, url: String },
 }
 
 /// An event received from or to be sent to a room
@@ -105,14 +103,12 @@ pub enum RoomEvent {
     /// The topice of the room.
     Topic(String),
     /// The avatar (an image) of the room.
-    Avatar{url:String},
+    Avatar { url: String },
 }
-
-
 
 impl HomeserverBuilder<(), (), ()> {
     /// Set the access token
-    pub fn access_token(self, access_token : &str) -> HomeserverBuilder<(), (), String> {
+    pub fn access_token(self, access_token: &str) -> HomeserverBuilder<(), (), String> {
         HomeserverBuilder {
             server: self.server,
             username: self.username,
@@ -123,8 +119,8 @@ impl HomeserverBuilder<(), (), ()> {
 }
 
 impl<T> HomeserverBuilder<(), T, ()> {
-    /// Set the username 
-    pub fn username(self, username : &str) -> HomeserverBuilder<String, T, ()> {
+    /// Set the username
+    pub fn username(self, username: &str) -> HomeserverBuilder<String, T, ()> {
         HomeserverBuilder {
             server: self.server,
             username: username.to_owned(),
@@ -135,8 +131,8 @@ impl<T> HomeserverBuilder<(), T, ()> {
 }
 
 impl<T> HomeserverBuilder<T, (), ()> {
-    /// Set the password 
-    pub fn password(self, password : &str) -> HomeserverBuilder<T, String, ()> {
+    /// Set the password
+    pub fn password(self, password: &str) -> HomeserverBuilder<T, String, ()> {
         HomeserverBuilder {
             server: self.server,
             username: self.username,
@@ -162,39 +158,41 @@ impl HomeserverBuilder<String, String, ()> {
     /// If the server does not support or allow simple username and password
     /// login, this function panics.
     pub fn login(self) -> HomeserverBuilder<String, String, String> {
-
         let at_info: AccesstokenInfo = {
             let client = reqwest::Client::new();
 
-            let mut res = client.get(
-                &format!("{}/_matrix/client/r0/login", self.server))
+            let mut res = client
+                .get(&format!("{}/_matrix/client/r0/login", self.server))
                 .send()
                 .unwrap();
 
-            let mut pwlogin : bool = false;
-            
+            let mut pwlogin: bool = false;
+
             let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
             match v["flows"].as_array() {
-                Some(flowlist) =>               
-                    for flow in flowlist {
-                        match flow["type"].as_str() {
-                            Some("m.login.password") => {println!("Found login option `m.login.password`"); pwlogin = true;}
-                            _ => ()
+                Some(flowlist) => for flow in flowlist {
+                    match flow["type"].as_str() {
+                        Some("m.login.password") => {
+                            println!("Found login option `m.login.password`");
+                            pwlogin = true;
                         }
-                    },
-                _ => ()
+                        _ => (),
+                    }
+                },
+                _ => (),
             }
-            if !pwlogin {panic!("Server does not offer the login option `m.login.password`")}
+            if !pwlogin {
+                panic!("Server does not offer the login option `m.login.password`")
+            }
 
-            let mut map : HashMap<&str, &str> = HashMap::new();
+            let mut map: HashMap<&str, &str> = HashMap::new();
 
             map.insert("type", "m.login.password");
             map.insert("user", &self.username);
             map.insert("password", &self.password);
-            
-            let mut res = client.post(
-                &format!("{}/_matrix/client/r0/login",
-                         self.server))
+
+            let mut res = client
+                .post(&format!("{}/_matrix/client/r0/login", self.server))
                 .json(&map)
                 .send()
                 .unwrap();
@@ -202,7 +200,7 @@ impl HomeserverBuilder<String, String, ()> {
             //println!("{}",res.text().unwrap());
             res.json().unwrap()
         };
-        
+
         HomeserverBuilder {
             server: self.server,
             username: self.username,
@@ -215,8 +213,11 @@ impl HomeserverBuilder<String, String, ()> {
 impl<T, R> HomeserverBuilder<T, R, String> {
     pub fn connect(self) -> Homeserver {
         Homeserver {
-            client : Rc::new(reqwest::Client::new()),
-            info: ServerInfo { server_name: self.server, access_token: self.access_token }
+            client: Rc::new(reqwest::Client::new()),
+            info: ServerInfo {
+                server_name: self.server,
+                access_token: self.access_token,
+            },
         }
     }
 }
@@ -229,7 +230,7 @@ impl Homeserver {
     ///
     /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
     /// * `access_token` – The access token
-    pub fn new(server_url : &str) -> HomeserverBuilder<(),(),()> {
+    pub fn new(server_url: &str) -> HomeserverBuilder<(), (), ()> {
         HomeserverBuilder {
             server: server_url.to_owned(),
             username: (),
@@ -237,7 +238,7 @@ impl Homeserver {
             access_token: (),
         }
     }
-   
+
     /// Create a new Homeserver object
     ///
     /// This does not create a stateful connection.
@@ -246,11 +247,9 @@ impl Homeserver {
     /// * `server_name` – The homeserver URL without trailing slash, e. g. `https://matrix.org`
     /// * `access_token` – The access token
     pub fn connect(server_url: &str, access_token: &str) -> Self {
-        Self::new(server_url)
-            .access_token(access_token)
-            .connect()
+        Self::new(server_url).access_token(access_token).connect()
     }
-    
+
     /// Create a new Homeserver object from username an password combination
     ///
     /// This does not create a stateful connection.
@@ -286,17 +285,19 @@ impl Homeserver {
     /// to only create the room object.
     ///
     /// If the room cannot be joined, `None` is returned
-    pub fn join_room(&self, room_name : String) -> Option<Room> {
-        let map : HashMap<String,String> = HashMap::new();
-        
-        let mut res = self.client.post(
-            &format!("{}{}{}{}{}",
-                    self.info.server_name,
-                    "/_matrix/client/r0/join/",
-                    utf8_percent_encode(&room_name, PATH_SEGMENT_ENCODE_SET).to_string(),
-                    "?access_token=",
-                    utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
-            .json(&map)
+    pub fn join_room(&self, room_name: String) -> Option<Room> {
+        let map: HashMap<String, String> = HashMap::new();
+
+        let mut res = self
+            .client
+            .post(&format!(
+                "{}{}{}{}{}",
+                self.info.server_name,
+                "/_matrix/client/r0/join/",
+                utf8_percent_encode(&room_name, PATH_SEGMENT_ENCODE_SET).to_string(),
+                "?access_token=",
+                utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()
+            )).json(&map)
             .send()
             .unwrap();
         let info: Result<JoinInfo, _> = res.json();
@@ -304,11 +305,11 @@ impl Homeserver {
             Ok(info) => Some(Room {
                 id: info.room_id,
                 latest_since: None,
-                client : self.client.clone(),
-                info : self.info.clone(),
+                client: self.client.clone(),
+                info: self.info.clone(),
             }),
-            _ => None
-        }        
+            _ => None,
+        }
     }
 
     /// Creates a new Matrix room on the server and returns a Matrix room object
@@ -317,17 +318,19 @@ impl Homeserver {
     /// Thus, everyone can join the room.
     ///
     /// If the room cannot be created or already exists, `None` is returned.
-    pub fn create_room(&self, room_name : String) -> Option<Room> {
-        let mut map : HashMap<String,String> = HashMap::new();
-        
-        map.insert("room_alias_name".to_owned() , room_name);
-        map.insert("preset".to_owned() , "public_chat".to_owned());
-        
-        let mut res = self.client.post(
-            &format!("{}/_matrix/client/r0/createRoom?access_token={}",
-                     self.info.server_name,
-                     utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
-            .json(&map)
+    pub fn create_room(&self, room_name: String) -> Option<Room> {
+        let mut map: HashMap<String, String> = HashMap::new();
+
+        map.insert("room_alias_name".to_owned(), room_name);
+        map.insert("preset".to_owned(), "public_chat".to_owned());
+
+        let mut res = self
+            .client
+            .post(&format!(
+                "{}/_matrix/client/r0/createRoom?access_token={}",
+                self.info.server_name,
+                utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()
+            )).json(&map)
             .send()
             .unwrap();
         let info: Result<JoinInfo, _> = res.json();
@@ -335,10 +338,10 @@ impl Homeserver {
             Ok(info) => Some(Room {
                 id: info.room_id,
                 latest_since: None,
-                client : self.client.clone(),
-                info : self.info.clone(),
+                client: self.client.clone(),
+                info: self.info.clone(),
             }),
-            _ => None
+            _ => None,
         }
     }
 
@@ -346,19 +349,21 @@ impl Homeserver {
     ///
     /// Returns a list of all room, the bot has been invited to.
     pub fn get_invites(&mut self) -> Vec<String> {
-        let res = self.client.get(
-            &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[]}}}}&access_token={}",
-                     self.info.server_name,
-                     utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()))
-            .send();
+        let res = self
+            .client
+            .get(&format!(
+                "{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[]}}}}&access_token={}",
+                self.info.server_name,
+                utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()
+            )).send();
 
         // println!("{}",&res.unwrap().text().unwrap());
-        // return 
-        
+        // return
+
         match res {
             Ok(mut res) => {
                 let mut vec = Vec::new();
-                
+
                 let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
                 match v["rooms"]["invite"].as_object() {
                     Some(invitelist) => for (room, info) in invitelist {
@@ -367,12 +372,12 @@ impl Homeserver {
                                 vec.push(room.to_owned());
                             }
                         }
-                    }
-                    _ => ()
+                    },
+                    _ => (),
                 }
                 vec
-            }          
-            _ => Vec::new()
+            }
+            _ => Vec::new(),
         }
     }
 }
@@ -412,46 +417,56 @@ impl Room {
 
         //println!("{}",&res.unwrap().text().unwrap());
         //return Vec::new();
-        
+
         match res {
             Ok(mut res) => {
                 let mut vec = Vec::new();
-                
+
                 let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
                 self.latest_since = Some(v["next_batch"].as_str().unwrap().to_owned());
                 match v["rooms"]["join"][&self.id]["timeline"]["events"].as_array() {
                     Some(eventlist) => for event in eventlist {
                         match event["content"]["msgtype"].as_str() {
-                            Some("m.text") => vec.push(RoomEvent::Message(Message::Text(event["content"]["body"].as_str().unwrap().to_owned()))),
-                            Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(event["content"]["body"].as_str().unwrap().to_owned()))),
-                            Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(event["content"]["body"].as_str().unwrap().to_owned()))),
-                            Some("m.image") => vec.push(RoomEvent::Message(Message::Image
-                                                                           { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                             url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                            Some("m.file") => vec.push(RoomEvent::Message(Message::File
-                                                                          { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                            url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                            Some("m.location") => vec.push(RoomEvent::Message(Message::Location
-                                                                              { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                                geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned() })),
-                            Some("m.video") => vec.push(RoomEvent::Message(Message::Audio
-                                                                           { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                             url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                            Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio
-                                                                           { body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                                                             url: event["content"]["url"].as_str().unwrap().to_owned() })),
-                            _ => ()
+                            Some("m.text") => vec.push(RoomEvent::Message(Message::Text(
+                                event["content"]["body"].as_str().unwrap().to_owned(),
+                            ))),
+                            Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(
+                                event["content"]["body"].as_str().unwrap().to_owned(),
+                            ))),
+                            Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(
+                                event["content"]["body"].as_str().unwrap().to_owned(),
+                            ))),
+                            Some("m.image") => vec.push(RoomEvent::Message(Message::Image {
+                                body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                url: event["content"]["url"].as_str().unwrap().to_owned(),
+                            })),
+                            Some("m.file") => vec.push(RoomEvent::Message(Message::File {
+                                body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                url: event["content"]["url"].as_str().unwrap().to_owned(),
+                            })),
+                            Some("m.location") => vec.push(RoomEvent::Message(Message::Location {
+                                body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned(),
+                            })),
+                            Some("m.video") => vec.push(RoomEvent::Message(Message::Audio {
+                                body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                url: event["content"]["url"].as_str().unwrap().to_owned(),
+                            })),
+                            Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio {
+                                body: event["content"]["body"].as_str().unwrap().to_owned(),
+                                url: event["content"]["url"].as_str().unwrap().to_owned(),
+                            })),
+                            _ => (),
                         }
                     },
-                    _ => ()
+                    _ => (),
                 }
-                
+
                 vec
-            },
-            _ => Vec::new()
+            }
+            _ => Vec::new(),
         }
     }
-
 
     /// Send a message to a room
     ///
@@ -473,54 +488,55 @@ impl Room {
     /// room.send_message(message);
     /// ```
     pub fn send_message(&self, message: Message) {
-        let mut map : HashMap<String,String> = HashMap::new();
+        let mut map: HashMap<String, String> = HashMap::new();
 
         match message {
             Message::Text(text) => {
-                map.insert("msgtype".to_owned() , "m.text".to_owned());
-                map.insert("body".to_owned() , text);
-            },
+                map.insert("msgtype".to_owned(), "m.text".to_owned());
+                map.insert("body".to_owned(), text);
+            }
             Message::Emote(text) => {
-                map.insert("msgtype".to_owned() , "m.emote".to_owned());
-                map.insert("body".to_owned() , text);
-            },
+                map.insert("msgtype".to_owned(), "m.emote".to_owned());
+                map.insert("body".to_owned(), text);
+            }
             Message::Notice(text) => {
-                map.insert("msgtype".to_owned() , "m.notice".to_owned());
-                map.insert("body".to_owned() , text);
-            },
-            Message::Image{body, url} => {
-                map.insert("msgtype".to_owned() , "m.image".to_owned());
-                map.insert("body".to_owned() , body);
-                map.insert("url".to_owned() , url);
-            },
-            Message::File{body, url} => {
-                map.insert("msgtype".to_owned() , "m.image".to_owned());
-                map.insert("body".to_owned() , body);
-                map.insert("url".to_owned() , url);
-            },
-            Message::Location{body, geo_uri} => {
-                map.insert("msgtype".to_owned() , "m.image".to_owned());
-                map.insert("body".to_owned() , body);
-                map.insert("geo_uri".to_owned() , geo_uri);
-            },
-            Message::Audio{body, url} => {
-                map.insert("msgtype".to_owned() , "m.image".to_owned());
-                map.insert("body".to_owned() , body);
-                map.insert("url".to_owned() , url);
-            },
-            Message::Video{body, url} => {
-                map.insert("msgtype".to_owned() , "m.image".to_owned());
-                map.insert("body".to_owned() , body);
-                map.insert("url".to_owned() , url);
-            },
-        }    
-        self.client.put(
-            &format!("{}/_matrix/client/r0/rooms/{}/send/m.room.message/{}?access_token={}",
-                     self.info.server_name,                     
-                     utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
-                     rand::random::<u64>(),
-                     utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string())) 
-            .json(&map)
+                map.insert("msgtype".to_owned(), "m.notice".to_owned());
+                map.insert("body".to_owned(), text);
+            }
+            Message::Image { body, url } => {
+                map.insert("msgtype".to_owned(), "m.image".to_owned());
+                map.insert("body".to_owned(), body);
+                map.insert("url".to_owned(), url);
+            }
+            Message::File { body, url } => {
+                map.insert("msgtype".to_owned(), "m.image".to_owned());
+                map.insert("body".to_owned(), body);
+                map.insert("url".to_owned(), url);
+            }
+            Message::Location { body, geo_uri } => {
+                map.insert("msgtype".to_owned(), "m.image".to_owned());
+                map.insert("body".to_owned(), body);
+                map.insert("geo_uri".to_owned(), geo_uri);
+            }
+            Message::Audio { body, url } => {
+                map.insert("msgtype".to_owned(), "m.image".to_owned());
+                map.insert("body".to_owned(), body);
+                map.insert("url".to_owned(), url);
+            }
+            Message::Video { body, url } => {
+                map.insert("msgtype".to_owned(), "m.image".to_owned());
+                map.insert("body".to_owned(), body);
+                map.insert("url".to_owned(), url);
+            }
+        }
+        self.client
+            .put(&format!(
+                "{}/_matrix/client/r0/rooms/{}/send/m.room.message/{}?access_token={}",
+                self.info.server_name,
+                utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
+                rand::random::<u64>(),
+                utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()
+            )).json(&map)
             .send()
             .unwrap();
     }
@@ -529,19 +545,19 @@ impl Room {
     ///
     /// * `user_id` – The fully qualified user ID of the invitee.
     pub fn invite(&self, user_id: &str) {
-        let mut map : HashMap<&str, &str> = HashMap::new();
+        let mut map: HashMap<&str, &str> = HashMap::new();
         map.insert("user_id", user_id);
-        self.client.put(
-            &format!("{}/_matrix/client/r0/rooms/{}/invite?access_token={}",
-                     self.info.server_name,                     
-                     utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
-                     utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string())) 
-            .json(&map)
+        self.client
+            .put(&format!(
+                "{}/_matrix/client/r0/rooms/{}/invite?access_token={}",
+                self.info.server_name,
+                utf8_percent_encode(&self.id, PATH_SEGMENT_ENCODE_SET).to_string(),
+                utf8_percent_encode(&self.info.access_token, ACCESS_TOKEN_ENCODE_SET).to_string()
+            )).json(&map)
             .send()
             .unwrap();
     }
-    
-    
+
     /// Send a message of type `text` to a room
     ///
     /// Shortcut for `send_message(Message::Text(…))`
@@ -564,7 +580,7 @@ impl Room {
     /// An emote describes an action that is being performed.
     /// This corresponds to the IRC CTCP ACTION command and is usually induced
     /// by the prefix `/me`.
-    /// 
+    ///
     ///
     /// # Examples
     ///
@@ -574,7 +590,7 @@ impl Room {
     pub fn send_emote(&self, text: String) {
         self.send_message(Message::Emote(text));
     }
-    
+
     /// Send a message of type `notice` to a room
     ///
     /// Shortcut for `send_message(Message::Notice(…))`
@@ -591,5 +607,3 @@ impl Room {
         self.send_message(Message::Notice(text));
     }
 }
-
-
