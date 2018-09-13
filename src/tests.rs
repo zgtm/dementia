@@ -10,6 +10,5 @@ const SYNC_EXAMPLE_VALUE : &'static str = include_str!("sync_example.json");
 fn deserialize_example() {
     let msg : sync::SyncMsg = serde_json::from_str(SYNC_EXAMPLE_VALUE).unwrap();
 
-
-    assert_eq!(msg.json.next_batch, "s72595_4483_1934");
+    assert_eq!(msg.json.next_batch, Some("s72595_4483_1934".into()));
 }

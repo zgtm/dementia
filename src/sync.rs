@@ -10,7 +10,7 @@ pub struct SyncMsg {
 
 #[derive(Deserialize, Clone)]
 pub struct SyncMsgJson {
-    pub next_batch: String,
+    pub next_batch: Option<String>,
     pub rooms: SyncRooms
 }
 
@@ -28,39 +28,47 @@ pub struct SyncRoomsInvite { }
 
 #[derive(Deserialize, Clone)]
 pub struct SyncRoomsJoin {
-    timeline: SyncRoomsJoinTimeline,
+    pub timeline: SyncRoomsJoinTimeline,
 }
 
 
 #[derive(Deserialize, Clone)]
 pub struct SyncRoomsJoinTimeline {
-    prev_batch: String,
-    events: Vec<SyncRoomsJoinTimelineEvent>,
+    pub prev_batch: String,
+    pub events: Vec<RoomEvent>,
 }
 
 #[derive(Deserialize, Clone)]
 #[serde(tag = "type")]
-pub enum SyncRoomsJoinTimelineEvent {
+pub enum RoomEvent {
     #[serde(rename = "m.room.message")]
-    Message(SyncRoomsJoinTimelineEventMessage),
+    Message{
+        sender: String,
+        content: MessageContent,
+    },
     #[serde(rename = "m.room.member")]
     Member,
 }
 
-#[derive(Deserialize, Clone)]
-pub struct SyncRoomsJoinTimelineEventMessage {
-    sender: String,
-    content: SyncRoomsJoinTimelineEventMessageContent,
-}
+
 
 #[derive(Deserialize, Clone)]
 #[serde(tag = "msgtype")]
-pub enum SyncRoomsJoinTimelineEventMessageContent{
+pub enum MessageContent {
     #[serde(rename = "m.text")]
-    Message(SyncRoomsJoinTimelineEventMessageContentText),
-}
-
-#[derive(Deserialize, Clone)]
-pub struct SyncRoomsJoinTimelineEventMessageContentText {
-    body: String,
+    Text{ body: String },
+    #[serde(rename = "m.emote")]
+    Emote { body: String },
+    #[serde(rename = "m.notice")]
+    Notice { body: String },
+    #[serde(rename = "m.file")]
+    File { body: String, url: String },
+    #[serde(rename = "m.image")]
+    Image { body: String, url: String },
+    #[serde(rename = "m.video")]
+    Video { body: String, url: String },
+    #[serde(rename = "m.audio")]
+    Audio { body: String, url: String },
+    #[serde(rename = "m.location")]
+    Location { body: String, geo_uri: String },
 }
