@@ -1,5 +1,10 @@
 # Dementia
 
+[![Latest version](https://img.shields.io/crates/v/dementia.svg)](https://crates.io/crates/dementia)
+[![Documentation](https://docs.rs/dementia/badge.svg)](https://docs.rs/dementia)
+![License](https://img.shields.io/crates/l/dementia.svg)
+![Maintenance](https://img.shields.io/badge/maintenance-experimental-blue.svg)
+
 Small rust library for the [Matrix protocol](https://matrix.org/)
 
 ## Status
@@ -10,9 +15,16 @@ Right now, only the following are supported:
   * sending text messages and
   * receiving text messages
 
-Support for room creation and receiving other kinds of messages are planned for the near time.
+Support for room creation and receiving other kinds of messages are planned for the near time. Also, image upload is on my personal to-do list. :)
 
 ## Usage
+
+First, add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+dementia = "*"
+```
 
 In order to connect to a Matrix homeserver and join a room, you need a user on that homeserver and an access token for that user.
 
