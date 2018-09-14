@@ -48,6 +48,8 @@ pub enum RoomEvent {
     },
     #[serde(rename = "m.room.member")]
     Member,
+    #[serde(rename = "m.room.redaction")]
+    Redaction,
 }
 
 
