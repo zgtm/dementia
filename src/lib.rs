@@ -1,14 +1,4 @@
-//! A module for writing Matrix bots
-//!
-//! This module maps some parts of the Matrix client-server protocoll to rust
-//! objects.
-//! In order to communicate with the Matrix homeserver, this library needs an
-//! authentication token (`access_token`).
-//! This authentication token can either be given directly, or can be generated
-//! using username-password authentication, if the homeserver supports this.
-//! With this authentication token, rooms can be joined or created.
-//! After as room has been joined, messages can be sent to the room and new
-//! messages can be fetched from from the room.
+#[doc(include = "readme.md")]
 
 #[macro_use]
 extern crate serde_derive;
