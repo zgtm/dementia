@@ -1,13 +1,17 @@
 [package]
 name = "dementia"
-version = "0.0.4-pre1"
+version = "0.0.4"
 authors = ["Robert Czechowski <robert+git@czecho.de>"]
 description = "A small client library for the Matrix protocol"
-license="Apache-2.0/GPL-3.0"
+
+documentation = "https://docs.rs/dementia"
+repository = "https://github.com/zgtm/dementia"
+
+readme = "readme.md"
 keywords = ["matrix", "chat", "protocol", "riot"]
 categories = ["api-bindings", "network-programming"]
-readme = "readme.md"
-repository = "https://github.com/zgtm/dementia"
+
+license="Apache-2.0/GPL-3.0"
 
 [dependencies]
 reqwest = "0.8"
