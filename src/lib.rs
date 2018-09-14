@@ -71,6 +71,7 @@ pub struct Homeserver {
 /// Represents a Matrix room from which events can be fetched from
 pub struct Room {
     id: String,
+    name: String,
     latest_since: Option<String>,
     client: Rc<reqwest::Client>,
     info: ServerInfo,
@@ -276,6 +277,7 @@ impl Homeserver {
         let info: Result<JoinInfo, _> = res.json();
         match info {
             Ok(info) => Some(Room {
+                name: room_name,
                 id: info.room_id,
                 latest_since: None,
                 client: self.client.clone(),
@@ -294,7 +296,7 @@ impl Homeserver {
     pub fn create_room(&self, room_name: String) -> Option<Room> {
         let mut map: HashMap<String, String> = HashMap::new();
 
-        map.insert("room_alias_name".to_owned(), room_name);
+        map.insert("room_alias_name".to_owned(), room_name.clone());
         map.insert("preset".to_owned(), "public_chat".to_owned());
 
         let mut res = self
@@ -309,6 +311,7 @@ impl Homeserver {
         let info: Result<JoinInfo, _> = res.json();
         match info {
             Ok(info) => Some(Room {
+                name: room_name,
                 id: info.room_id,
                 latest_since: None,
                 client: self.client.clone(),
@@ -356,6 +359,14 @@ impl Homeserver {
 }
 
 impl Room {
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
     /// Receive all new events in a room since the last time this function has
     /// been called
     ///
