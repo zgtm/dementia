@@ -17,6 +17,8 @@ extern crate serde_json;
 #[macro_use]
 extern crate url;
 
+mod sync;
+
 use serde_json::Value;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -477,12 +479,12 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
-    /// let message = Message::Notice("Hallo".to_owned());
+    /// ```ignore
+    /// let message = RoomEvent::Message::Notice("Hallo".to_owned());
     /// room.send_message(message);
     /// ```
     ///
-    /// ```
+    /// ```ignore
     /// let logo_url = String::from("https://www.rust-lang.org/logos/rust-logo-128x128.png");
     /// let message = Message::Image{body: "Rust Logo".to_owned(), url: logo_url};
     /// room.send_message(message);
@@ -567,7 +569,7 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// room.send_text("Hallo".to_owned());
     /// ```
     pub fn send_text(&self, text: String) {
@@ -584,7 +586,7 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// room.send_emote("is having trouble".to_owned());
     /// ```
     pub fn send_emote(&self, text: String) {
@@ -600,10 +602,15 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// room.send_notice("Hallo".to_owned());
     /// ```
     pub fn send_notice(&self, text: String) {
         self.send_message(Message::Notice(text));
     }
 }
+
+#[cfg(test)]
+mod tests;
+
+

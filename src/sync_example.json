@@ -1,0 +1,133 @@
+{
+  "application/json": {
+    "account_data": {
+      "events": [
+        {
+          "content": {
+            "custom_config_key": "custom_config_value"
+          },
+          "type": "org.example.custom.config"
+        }
+      ]
+    },
+    "next_batch": "s72595_4483_1934",
+    "presence": {
+      "events": [
+        {
+          "content": {
+            "presence": "online"
+          },
+          "sender": "@alice:example.com",
+          "type": "m.presence"
+        }
+      ]
+    },
+    "rooms": {
+      "invite": {
+        "!696r7674:example.com": {
+          "invite_state": {
+            "events": [
+              {
+                "content": {
+                  "name": "My Room Name"
+                },
+                "sender": "@alice:example.com",
+                "state_key": "",
+                "type": "m.room.name"
+              },
+              {
+                "content": {
+                  "membership": "invite"
+                },
+                "sender": "@alice:example.com",
+                "state_key": "@bob:example.com",
+                "type": "m.room.member"
+              }
+            ]
+          }
+        }
+      },
+      "join": {
+        "!726s6s6q:example.com": {
+          "account_data": {
+            "events": [
+              {
+                "content": {
+                  "tags": {
+                    "work": {
+                      "order": 1
+                    }
+                  }
+                },
+                "type": "m.tag"
+              },
+              {
+                "content": {
+                  "custom_config_key": "custom_config_value"
+                },
+                "type": "org.example.custom.room.config"
+              }
+            ]
+          },
+          "ephemeral": {
+            "events": [
+              {
+                "content": {
+                  "user_ids": [
+                    "@alice:example.com"
+                  ]
+                },
+                "type": "m.typing"
+              }
+            ]
+          },
+          "state": {
+            "events": [
+              {
+                "content": {
+                  "membership": "join"
+                },
+                "event_id": "$66697273743031:example.com",
+                "origin_server_ts": 1417731086795,
+                "sender": "@alice:example.com",
+                "state_key": "@alice:example.com",
+                "type": "m.room.member"
+              }
+            ]
+          },
+          "timeline": {
+            "events": [
+              {
+                "content": {
+                  "membership": "join"
+                },
+                "event_id": "$7365636s6r6432:example.com",
+                "origin_server_ts": 1417731086795,
+                "prev_content": {
+                  "membership": "invite"
+                },
+                "sender": "@bob:example.com",
+                "state_key": "@bob:example.com",
+                "type": "m.room.member"
+              },
+              {
+                "content": {
+                  "body": "I am a fish",
+                  "msgtype": "m.text"
+                },
+                "event_id": "$74686972643033:example.com",
+                "origin_server_ts": 1417731086797,
+                "sender": "@alice:example.com",
+                "txn_id": "1234",
+                "type": "m.room.message"
+              }
+            ],
+            "limited": true,
+            "prev_batch": "t34-23535_0_0"
+          }
+        }
+      },
+      "leave": {}
+    }
+  }
+}
