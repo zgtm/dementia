@@ -1,6 +1,6 @@
 extern crate dementia;
 
-use dementia::{Homeserver, Message, RoomEvent};
+use dementia::{Homeserver, MessageContent, RoomEvent};
 use std::{thread, time};
 
 fn main() {
@@ -38,11 +38,17 @@ fn main() {
         // Reply to message "hi" in room given as parameter
         for event in room.get_new_messages() {
             match event {
-                RoomEvent::Message(Message::Text(text)) => {
-                    println!("{}", text);
-                    if text == "hi" {
-                        room.send_notice("ahoi!".to_owned());
+                RoomEvent::Message{
+                    content,
+                    ..
+                } => match content {
+                    MessageContent::Text { body} => {
+                        println!("{}", body);
+                        if body == "hi" {
+                            room.send_notice("ahoi!".to_owned());
+                        }
                     }
+                    _ => (),
                 }
                 _ => (),
             }

@@ -16,6 +16,9 @@ extern crate reqwest;
 extern crate serde_json;
 #[macro_use]
 extern crate url;
+extern crate rand;
+
+mod sync;
 
 use serde_json::Value;
 use std::collections::HashMap;
@@ -68,43 +71,14 @@ pub struct Homeserver {
 /// Represents a Matrix room from which events can be fetched from
 pub struct Room {
     id: String,
+    name: String,
     latest_since: Option<String>,
     client: Rc<reqwest::Client>,
     info: ServerInfo,
 }
 
-/// A message received from or to be sent to a room
-pub enum Message {
-    /// Text message. Should not be used to reply to messages!
-    Text(String),
-    /// Emote. Represents an action.
-    Emote(String),
-    /// Notice. Should be used for automatic replies. Should not be replied to!
-    Notice(String),
-    /// Image file. The URL should be created by uploading to the homesever.
-    Image { body: String, url: String },
-    /// File. The URL should be created by uploading to the homesever.
-    File { body: String, url: String },
-    /// Location. `geo_uri` should be a Geo URI.
-    /// E. g. `geo:37.786971,-122.399677`.
-    Location { body: String, geo_uri: String },
-    /// Video file. The URL should be created by uploading to the homesever.
-    Video { body: String, url: String },
-    /// Audio file. The URL should be created by uploading to the homesever.
-    Audio { body: String, url: String },
-}
-
-/// An event received from or to be sent to a room
-pub enum RoomEvent {
-    /// A message in the room.
-    Message(Message),
-    /// The name of the room.
-    Name(String),
-    /// The topice of the room.
-    Topic(String),
-    /// The avatar (an image) of the room.
-    Avatar { url: String },
-}
+pub use sync::RoomEvent;
+pub use sync::MessageContent;
 
 impl HomeserverBuilder<(), (), ()> {
     /// Set the access token
@@ -303,6 +277,7 @@ impl Homeserver {
         let info: Result<JoinInfo, _> = res.json();
         match info {
             Ok(info) => Some(Room {
+                name: room_name,
                 id: info.room_id,
                 latest_since: None,
                 client: self.client.clone(),
@@ -321,7 +296,7 @@ impl Homeserver {
     pub fn create_room(&self, room_name: String) -> Option<Room> {
         let mut map: HashMap<String, String> = HashMap::new();
 
-        map.insert("room_alias_name".to_owned(), room_name);
+        map.insert("room_alias_name".to_owned(), room_name.clone());
         map.insert("preset".to_owned(), "public_chat".to_owned());
 
         let mut res = self
@@ -336,6 +311,7 @@ impl Homeserver {
         let info: Result<JoinInfo, _> = res.json();
         match info {
             Ok(info) => Some(Room {
+                name: room_name,
                 id: info.room_id,
                 latest_since: None,
                 client: self.client.clone(),
@@ -382,9 +358,15 @@ impl Homeserver {
     }
 }
 
-extern crate rand;
-
 impl Room {
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
     /// Receive all new events in a room since the last time this function has
     /// been called
     ///
@@ -398,7 +380,7 @@ impl Room {
     ///
     /// # Examples
     ///
-    pub fn get_new_messages(&mut self) -> Vec<RoomEvent> {
+    pub fn get_new_messages(&mut self) -> Vec<sync::RoomEvent> {
         let res = match self.latest_since.clone() {
             None => self.client.get(
                 &format!("{}/_matrix/client/r0/sync?filter={{\"room\":{{\"rooms\":[\"{}\"],\"timeline\":{{\"limit\":0}}}}}}&access_token={}",
@@ -415,56 +397,15 @@ impl Room {
                 .send()
         };
 
-        //println!("{}",&res.unwrap().text().unwrap());
-        //return Vec::new();
-
         match res {
             Ok(mut res) => {
-                let mut vec = Vec::new();
-
-                let v: Value = serde_json::from_str(&(res.text().unwrap())).unwrap();
-                self.latest_since = Some(v["next_batch"].as_str().unwrap().to_owned());
-                match v["rooms"]["join"][&self.id]["timeline"]["events"].as_array() {
-                    Some(eventlist) => for event in eventlist {
-                        match event["content"]["msgtype"].as_str() {
-                            Some("m.text") => vec.push(RoomEvent::Message(Message::Text(
-                                event["content"]["body"].as_str().unwrap().to_owned(),
-                            ))),
-                            Some("m.emote") => vec.push(RoomEvent::Message(Message::Emote(
-                                event["content"]["body"].as_str().unwrap().to_owned(),
-                            ))),
-                            Some("m.notice") => vec.push(RoomEvent::Message(Message::Notice(
-                                event["content"]["body"].as_str().unwrap().to_owned(),
-                            ))),
-                            Some("m.image") => vec.push(RoomEvent::Message(Message::Image {
-                                body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                url: event["content"]["url"].as_str().unwrap().to_owned(),
-                            })),
-                            Some("m.file") => vec.push(RoomEvent::Message(Message::File {
-                                body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                url: event["content"]["url"].as_str().unwrap().to_owned(),
-                            })),
-                            Some("m.location") => vec.push(RoomEvent::Message(Message::Location {
-                                body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                geo_uri: event["content"]["geo_uri"].as_str().unwrap().to_owned(),
-                            })),
-                            Some("m.video") => vec.push(RoomEvent::Message(Message::Audio {
-                                body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                url: event["content"]["url"].as_str().unwrap().to_owned(),
-                            })),
-                            Some("m.audio") => vec.push(RoomEvent::Message(Message::Audio {
-                                body: event["content"]["body"].as_str().unwrap().to_owned(),
-                                url: event["content"]["url"].as_str().unwrap().to_owned(),
-                            })),
-                            _ => (),
-                        }
-                    },
-                    _ => (),
-                }
-
-                vec
+                let text = res.text().unwrap();
+                let mut v: sync::SyncMsgJson = serde_json::from_str(&text).unwrap();
+                self.latest_since = v.next_batch;
+                v.rooms.join.remove(&self.id).map(|room|
+                                                    room.timeline.events).unwrap_or_else(|| vec![])
             }
-            _ => Vec::new(),
+            _ => vec![],
         }
     }
 
@@ -477,53 +418,53 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
-    /// let message = Message::Notice("Hallo".to_owned());
+    /// ```ignore
+    /// let message = RoomEvent::Message::Notice("Hallo".to_owned());
     /// room.send_message(message);
     /// ```
     ///
-    /// ```
+    /// ```ignore
     /// let logo_url = String::from("https://www.rust-lang.org/logos/rust-logo-128x128.png");
     /// let message = Message::Image{body: "Rust Logo".to_owned(), url: logo_url};
     /// room.send_message(message);
     /// ```
-    pub fn send_message(&self, message: Message) {
+    pub fn send_message(&self, message: MessageContent) {
         let mut map: HashMap<String, String> = HashMap::new();
 
         match message {
-            Message::Text(text) => {
+            MessageContent::Text{ body } => {
                 map.insert("msgtype".to_owned(), "m.text".to_owned());
-                map.insert("body".to_owned(), text);
+                map.insert("body".to_owned(), body);
             }
-            Message::Emote(text) => {
+            MessageContent::Emote{ body } => {
                 map.insert("msgtype".to_owned(), "m.emote".to_owned());
-                map.insert("body".to_owned(), text);
+                map.insert("body".to_owned(), body);
             }
-            Message::Notice(text) => {
+            MessageContent::Notice{ body } => {
                 map.insert("msgtype".to_owned(), "m.notice".to_owned());
-                map.insert("body".to_owned(), text);
+                map.insert("body".to_owned(), body);
             }
-            Message::Image { body, url } => {
+            MessageContent::Image { body, url } => {
                 map.insert("msgtype".to_owned(), "m.image".to_owned());
                 map.insert("body".to_owned(), body);
                 map.insert("url".to_owned(), url);
             }
-            Message::File { body, url } => {
+            MessageContent::File { body, url } => {
                 map.insert("msgtype".to_owned(), "m.image".to_owned());
                 map.insert("body".to_owned(), body);
                 map.insert("url".to_owned(), url);
             }
-            Message::Location { body, geo_uri } => {
+            MessageContent::Location { body, geo_uri } => {
                 map.insert("msgtype".to_owned(), "m.image".to_owned());
                 map.insert("body".to_owned(), body);
                 map.insert("geo_uri".to_owned(), geo_uri);
             }
-            Message::Audio { body, url } => {
+            MessageContent::Audio { body, url } => {
                 map.insert("msgtype".to_owned(), "m.image".to_owned());
                 map.insert("body".to_owned(), body);
                 map.insert("url".to_owned(), url);
             }
-            Message::Video { body, url } => {
+            MessageContent::Video { body, url } => {
                 map.insert("msgtype".to_owned(), "m.image".to_owned());
                 map.insert("body".to_owned(), body);
                 map.insert("url".to_owned(), url);
@@ -567,11 +508,11 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// room.send_text("Hallo".to_owned());
     /// ```
     pub fn send_text(&self, text: String) {
-        self.send_message(Message::Text(text));
+        self.send_message(MessageContent::Text{body: text});
     }
     /// Send a message of type `emote` to a room
     ///
@@ -584,11 +525,11 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// room.send_emote("is having trouble".to_owned());
     /// ```
     pub fn send_emote(&self, text: String) {
-        self.send_message(Message::Emote(text));
+        self.send_message(MessageContent::Emote{body: text});
     }
 
     /// Send a message of type `notice` to a room
@@ -600,10 +541,15 @@ impl Room {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// room.send_notice("Hallo".to_owned());
     /// ```
     pub fn send_notice(&self, text: String) {
-        self.send_message(Message::Notice(text));
+        self.send_message(MessageContent::Notice{body: text});
     }
 }
+
+#[cfg(test)]
+mod tests;
+
+
