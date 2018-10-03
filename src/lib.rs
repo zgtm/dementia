@@ -17,7 +17,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate url;
 
-mod sync;
+mod matrix_types;
 
 use serde_json::Value;
 use std::collections::HashMap;
