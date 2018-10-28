@@ -17,7 +17,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate url;
 
-mod matrix_types;
+pub mod matrix_types;
 
 use serde_json::Value;
 use std::collections::HashMap;
@@ -25,6 +25,7 @@ use std::rc::Rc;
 
 use url::percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET, USERINFO_ENCODE_SET};
 define_encode_set! {
+    #[doc(hidden)]
     pub ACCESS_TOKEN_ENCODE_SET = [USERINFO_ENCODE_SET] | {
         '%', '&'
     }
@@ -54,6 +55,7 @@ struct ServerInfo {
     access_token: String,
 }
 
+#[doc(hidden)]
 pub struct HomeserverBuilder<Username, Password, AccessToken> {
     server: String,
     username: Username,
@@ -610,7 +612,5 @@ impl Room {
     }
 }
 
-#[cfg(test)]
-mod tests;
 
 
